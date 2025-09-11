@@ -1,7 +1,9 @@
 import dotenv from "dotenv";
 import type { Address } from "viem";
+import path from "node:path";
 
-dotenv.config({ path: __dirname + "/.env" });
+// Load .env in a way that works with ESM (no __dirname)
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 function getEnvVar<T extends string = string>(key: string, required = true): T {
   const value = process.env[key];

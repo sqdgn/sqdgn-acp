@@ -1,15 +1,16 @@
+// Work around package's default export quirk by importing ESM entry directly
 import AcpClient, {
     AcpContractClient,
     AcpJobPhases,
     AcpJob,
     AcpAgentSort,
     AcpGraduationStatus,
-    AcpOnlineStatus
-} from "@virtuals-protocol/acp-node";
+    AcpOnlineStatus,
+} from "@virtuals-protocol/acp-node/dist/index.mjs";
 import {
     BUYER_AGENT_WALLET_ADDRESS,
     WHITELISTED_WALLET_PRIVATE_KEY,
-    BUYER_ENTITY_ID,
+    BUYER_ENTITY_ID
 } from "./env";
 
 async function buyer() {
@@ -24,7 +25,7 @@ async function buyer() {
                 job.phase === AcpJobPhases.NEGOTIATION &&
                 job.memos.find((m) => m.nextPhase === AcpJobPhases.TRANSACTION)
             ) {
-                console.log("Paying job", job);
+                console.log(`Paying job ${job.id}`);
                 await job.pay(job.price);
                 console.log(`Job ${job.id} paid`);
             } else if (job.phase === AcpJobPhases.COMPLETED) {
@@ -34,7 +35,7 @@ async function buyer() {
             }
         },
         onEvaluate: async (job: AcpJob) => {
-            console.log("Evaluation function called", job);
+            console.log(`Evaluation function called for job ${job.id}`);
             await job.evaluate(true, "Self-evaluated and approved");
             console.log(`Job ${job.id} evaluated`);
         },
@@ -42,18 +43,20 @@ async function buyer() {
 
     // Browse available agents based on a keyword and cluster name
     const relevantAgents = await acpClient.browseAgents(
-        "Degen Squid alpha generating agnt",
+        "Degenerate Squid trade signals",
         {
-            cluster: "<your-cluster-name>",
             sort_by: [AcpAgentSort.SUCCESSFUL_JOB_COUNT],
-            top_k: 5,
+            top_k: 10,
             graduationStatus: AcpGraduationStatus.ALL,
             onlineStatus: AcpOnlineStatus.ALL,
         }
     );
+   
+    const chosenAgent = relevantAgents.find(a => a.name.toLowerCase() === 'degenerate squid');
 
-    // Pick one of the agents based on your criteria (in this example we just pick the first one)
-    const chosenAgent = relevantAgents[0];
+    if (!chosenAgent) {
+        throw new Error("Could not find the Degen Squid agent in the results");
+    }
     // Pick one of the service offerings based on your criteria (in this example we just pick the first one)
     const chosenJobOffering = chosenAgent.offerings[0];
 
