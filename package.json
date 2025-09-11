@@ -1,0 +1,22 @@
+{
+  "name": "acp-self-evaluation-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "seller": "tsx seller.ts",
+    "buyer": "tsx buyer.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "@virtuals-protocol/acp-node": "latest"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.2",
+    "typescript": "^5.4.5"
+  }
+}
+
