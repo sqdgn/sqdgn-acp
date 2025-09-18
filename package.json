@@ -8,7 +8,10 @@
   },
   "scripts": {
     "seller": "tsx seller.ts",
-    "buyer": "tsx buyer.ts"
+    "buyer": "tsx buyer.ts",
+    "build": "tsc",
+    "start": "node dist/seller.js",
+    "buyer:loop": "tsx buyer-interval.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
@@ -19,4 +22,3 @@
     "typescript": "^5.4.5"
   }
 }
-

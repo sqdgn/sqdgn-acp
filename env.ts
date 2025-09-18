@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import type { Address } from "viem";
-import path from "node:path";
+import path from "path";
 
 // Load .env in a way that works with ESM (no __dirname)
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
@@ -30,6 +30,12 @@ export const SELLER_AGENT_WALLET_ADDRESS = getEnvVar<Address>(
 export const SELLER_ENTITY_ID = parseInt(getEnvVar("SELLER_ENTITY_ID"));
 
 export const SQDGN_API_KEY = getEnvVar("SQDGN_API_KEY");
+
+// Optional target agent wallet for buyer selection
+export const TARGET_AGENT_WALLET_ADDRESS = getEnvVar(
+  "TARGET_AGENT_WALLET_ADDRESS",
+  false
+) as Address | undefined;
 
 const entities = {
   BUYER_ENTITY_ID,

@@ -11,7 +11,7 @@ import {
     BUYER_AGENT_WALLET_ADDRESS,
     WHITELISTED_WALLET_PRIVATE_KEY,
     BUYER_ENTITY_ID
-} from "./env";
+} from "./env.js";
 
 async function buyer() {
     const acpClient = new AcpClient({
