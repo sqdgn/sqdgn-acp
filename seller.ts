@@ -4,6 +4,8 @@ import AcpClient, {
     AcpJobPhases,
     AcpJob,
     AcpMemo,
+    AcpMemoStatus,
+    MemoType,
 } from '@virtuals-protocol/acp-node/dist/index.mjs';
 import {
     SELLER_AGENT_WALLET_ADDRESS,
@@ -61,6 +63,27 @@ function logQueue(jobId: number, action: JobAction | undefined, message: string)
 
 function logQueueError(jobId: number, action: JobAction, message: string) {
     console.error(`${queuePrefix(jobId, action)} ${message}`);
+}
+
+const memoTypeLabel = (type: MemoType | undefined) =>
+    type === undefined ? "unknown" : MemoType[type] ?? String(type);
+
+function describeMemo(memo: AcpMemo | undefined) {
+    if (!memo) return "memo=none";
+    return `memo=${memo.id},type=${memoTypeLabel(memo.type)},status=${memo.status},next=${phaseLabel(memo.nextPhase)}`;
+}
+
+function describeProgress(progress: JobProgress) {
+    return `progress(responded=${progress.responded}, delivered=${progress.delivered})`;
+}
+
+function describeJobSnapshot(job: AcpJob, memo: AcpMemo | undefined) {
+    const transitionMemo = memo ? describeMemo(memo) : "trigger=none";
+    const latestMemo = `latest=${describeMemo(job.latestMemo)}`;
+    const memoSummary = job.memos
+        .map((m) => `#${m.id}:${phaseLabel(m.nextPhase)}/${m.status}`)
+        .join(", ") || "none";
+    return `phase=${phaseLabel(job.phase)} | ${transitionMemo} | ${latestMemo} | memos(${job.memos.length})=[${memoSummary}]`;
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -125,6 +148,11 @@ class SellerJobQueue {
         this.updateCompletionState(job);
 
         const nextPhase = memo?.nextPhase ?? job.latestMemo?.nextPhase;
+        logQueue(
+            job.id,
+            undefined,
+            `Schedule invoked; ${describeJobSnapshot(job, memo)}`
+        );
         const action = this.determineAction(job, nextPhase);
         if (!action) {
             logQueue(
@@ -136,8 +164,23 @@ class SellerJobQueue {
         }
 
         const progress = this.getProgress(job.id);
+        logQueue(
+            job.id,
+            action,
+            `Preparing action; ${describeJobSnapshot(job, memo)} | ${describeProgress(progress)}`
+        );
         if ((action === "respond" && progress.responded) || (action === "deliver" && progress.delivered)) {
-            logQueue(job.id, action, "Skipping duplicate event; action already completed");
+            logQueue(job.id, action, `Skipping duplicate event; action already completed | ${describeProgress(progress)}`);
+            return;
+        }
+
+        const memoStatus = memo?.status ?? job.latestMemo?.status;
+        if (action === "deliver" && memoStatus === AcpMemoStatus.REJECTED) {
+            logQueue(
+                job.id,
+                action,
+                `Skipping delivery because memo status is ${memoStatus} | ${describeJobSnapshot(job, memo)}`
+            );
             return;
         }
 
@@ -241,19 +284,20 @@ class SellerJobQueue {
         logQueue(
             task.job.id,
             task.action,
-            `Completed attempt ${task.attempt}; pending=${this.pending.length}, retries=${this.retryTasks.size}`
+            `Completed attempt ${task.attempt}; pending=${this.pending.length}, retries=${this.retryTasks.size} | ${describeProgress(progress)}`
         );
     }
 
     private handleFailure(task: JobTask, err: unknown) {
         const { maxAttempts, baseRetryDelayMs } = this.options;
         const errorMessage = err instanceof Error ? err.message : String(err);
+        const progress = this.getProgress(task.job.id);
 
         if (task.attempt >= maxAttempts) {
             logQueueError(
                 task.job.id,
                 task.action,
-                `Failed after ${task.attempt} attempts: ${errorMessage}`
+                `Failed after ${task.attempt} attempts: ${errorMessage} | ${describeProgress(progress)}`
             );
             return;
         }
@@ -262,7 +306,7 @@ class SellerJobQueue {
         logQueueError(
             task.job.id,
             task.action,
-            `Attempt ${task.attempt} failed: ${errorMessage}. Retrying in ${delay}ms (pending=${this.pending.length}, retries=${this.retryTasks.size + 1})`
+            `Attempt ${task.attempt} failed: ${errorMessage}. Retrying in ${delay}ms (pending=${this.pending.length}, retries=${this.retryTasks.size + 1}) | ${describeProgress(progress)}`
         );
 
         this.retryTasks.set(task.key, task);
@@ -366,7 +410,8 @@ const queue = new SellerJobQueue(
             const attemptInfo = attempt > 1 ? ` (attempt ${attempt})` : "";
             console.log(`Responding to job ${job.id}${attemptInfo}`);
             logQueue(job.id, "respond", `Accepting job at price ${job.price}`);
-            await job.respond(true);
+            const txHash = await job.respond(true);
+            logQueue(job.id, "respond", `Responded with tx=${txHash ?? "undefined"}`);
             console.log(`Job ${job.id} responded`);
         },
         deliver: async (job, _memo, attempt) => {
@@ -380,13 +425,14 @@ const queue = new SellerJobQueue(
                     ? `keys=${Object.keys(signals).slice(0, 5).join(",")}`
                     : typeof signals;
             logQueue(job.id, "deliver", `Fetched signals payload summary: ${summary}`);
-            await job.deliver(
+            const txHash = await job.deliver(
                 {
                     type: "object",
                     value: { signals },
                 }
             );
 
+            logQueue(job.id, "deliver", `Deliver tx=${txHash}`);
             console.log(`Job ${job.id} delivered`);
         },
     },
